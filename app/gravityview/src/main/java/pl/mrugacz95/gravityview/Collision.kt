@@ -21,8 +21,8 @@ object Collision {
         var collisionNormal = Vec2.ZERO
         var collisionDepth = Double.MAX_VALUE
         for (body in listOf(body1, body2)) {
-            for (axis in body1.transformedAxes) {
-                val normal = (axis.second - axis.first).normal().normalize()
+            for (axis in body.transformedAxes) {
+                val normal = axis.axis.normal().normalize()
 
                 val b1Proj = projectPolygon(normal, body1)
                 val b2Proj = projectPolygon(normal, body2)

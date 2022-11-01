@@ -4,7 +4,7 @@ import android.graphics.Color
 import kotlin.math.max
 import kotlin.math.min
 
-abstract class Body(mass: Double, inertia: Double, val isStatic: Boolean) {
+abstract class Body(val isStatic: Boolean) {
     var pos = Vec2.ZERO
         set(value) {
             field = value
@@ -17,10 +17,31 @@ abstract class Body(mass: Double, inertia: Double, val isStatic: Boolean) {
         }
     var omega = .0
     var velocity = Vec2.ZERO
-    private val invMass: Double
-    private val invInertia: Double
+    var mass: Double = 1.0
+        set(value) {
+            if (value < 0) {
+                throw Exception("Mass can't be less then zero.")
+            }
+            if (isStatic) {
+                invInertia = 0.0
+            } else {
+                invMass = 1 / value
+            }
+            field = value
+        }
+    var invMass: Double = 0.0
+    var invInertia: Double
+    var inertia: Double = 1.0
+        set(value) {
+            if (isStatic) {
+                invInertia = 0.0
+            } else {
+                invInertia = 1 / value
+            }
+            field = value
+        }
     val color: Int
-    private val restitution = 0.2
+    val restitution = 0.2
     protected var transformUpdateRequired = true
     private var cachedAABB: AABB? = null
     val AABB: AABB
@@ -31,11 +52,9 @@ abstract class Body(mass: Double, inertia: Double, val isStatic: Boolean) {
                         cachedAABB = it
                         return it
                     }
-                } else {
-                    return cache
                 }
+                return cache
             }
-
         }
 
     init {
@@ -56,8 +75,8 @@ abstract class Body(mass: Double, inertia: Double, val isStatic: Boolean) {
         }
         this.pos += this.velocity * dt
         this.rotation += this.omega * dt
-        this.transformUpdateRequired = true
         this.cachedAABB = null
+        this.transformUpdateRequired = true
     }
 
     abstract fun calculateAABB(): AABB
@@ -68,43 +87,55 @@ abstract class Body(mass: Double, inertia: Double, val isStatic: Boolean) {
 }
 
 
-class Rectangle(val width: Double, val height: Double, mass: Double, isStatic: Boolean) :
+class Rectangle(isStatic: Boolean) :
     Body(
-        mass,
-        1 / 12 * mass * (width * width + height * height),
         isStatic
     ) {
-    private val points: Array<Vec2> = arrayOf(
+
+    var width: Double = 1.0
+        set(value) {
+            field = value
+            this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
+        }
+    var height: Double = 1.0
+        set(value) {
+            field = value
+            this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
+        }
+
+    private fun points(): Array<Vec2> = arrayOf(
         Vec2(-width / 2, height / 2),
         Vec2(width / 2, height / 2),
         Vec2(width / 2, -height / 2),
         Vec2(-width / 2, -height / 2)
     )
-    val cachedTransformedPoints = Array<Vec2>(4) { Vec2.ZERO }
+
+    private val cachedTransformedPoints = Array(4) { Vec2.ZERO }
 
     val transformedPoints: Array<Vec2>
         get() {
             if (transformUpdateRequired) {
+                val points = points()
                 for (i in points.indices) {
-                    this.cachedTransformedPoints[i] = this.points[i].rotate(rotation) + this.pos
+                    this.cachedTransformedPoints[i] = points[i].rotate(rotation) + this.pos
                 }
+                transformUpdateRequired = false
             }
-            transformUpdateRequired = false
             return cachedTransformedPoints
         }
 
-    val transformedAxes: Array<Pair<Vec2, Vec2>>
+    val transformedAxes: Array<Axis>
         get() = Array(transformedPoints.size) {
             val first = this.transformedPoints[it]
             val second = this.transformedPoints[(it + 1) % this.transformedPoints.size]
-            first to second
+            Axis(first, second, second - first)
         }
 
     override fun calculateAABB(): AABB {
         var minX = Double.MAX_VALUE
         var maxX = -Double.MAX_VALUE
-        var maxY = -Double.MAX_VALUE
         var minY = Double.MAX_VALUE
+        var maxY = -Double.MAX_VALUE
         for (p in this.transformedPoints) {
             minX = min(minX, p.x)
             maxX = max(maxX, p.x)
@@ -113,5 +144,6 @@ class Rectangle(val width: Double, val height: Double, mass: Double, isStatic: B
         }
         return AABB(minX, minY, maxX, maxY)
     }
-
 }
+
+data class Axis(val p1: Vec2, val p2: Vec2, val axis: Vec2)

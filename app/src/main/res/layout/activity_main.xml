@@ -10,11 +10,47 @@
     <pl.mrugacz95.gravityview.GravityView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:gravity="0.6">
+        app:layout_constraintTop_toTopOf="parent"
+        app:gravity="9.81">
 
-        <!--        <Button-->
-        <!--            android:layout_width="wrap_content"-->
-        <!--            android:layout_height="wrap_content"-->
-        <!--            android:text="Hello World!" />-->
+        <Button
+            android:layout_width="20dp"
+            android:layout_height="wrap_content"
+            android:text="Hello World!"
+            app:x_pos="150dp"
+            app:y_pos="40dp" />
+
+        <TextView
+            android:layout_width="20dp"
+            android:layout_height="wrap_content"
+            android:background="@drawable/frame"
+            android:text="Hello World!"
+            app:x_pos="160dp"
+            app:y_pos="10dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gravity"
+            app:x_pos="290dp"
+            app:y_pos="60dp" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_launcher_foreground"
+            android:hint="username"
+            android:inputType="text"
+            android:lines="2"
+            app:x_pos="90dp"
+            app:y_pos="300dp" />
+
+        <ImageView
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:src="@drawable/ic_launcher_background"
+            android:contentDescription="launch icon"
+            app:x_pos="80dp"
+            app:y_pos="220dp" />
     </pl.mrugacz95.gravityview.GravityView>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,6 +27,7 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
     private val dt: Double = 1.0 / 60
 
     private var tickJob: Job? = null
+    private var lastUpdateTime: Long = System.currentTimeMillis()
 
     suspend fun start(view: View) = coroutineScope {
         tickJob?.cancel()
@@ -33,13 +35,16 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
             tickerFlow(dt.seconds)
                 .cancellable()
                 .collectLatest {
-                    update()
+                    val now = System.currentTimeMillis()
+                    val dt = (now - lastUpdateTime) / 1000.0
+                    lastUpdateTime = now
+                    update(dt)
                     view.invalidate()
                 }
         }
     }
 
-    private fun update() {
+    private fun update(dt: Double) {
         for (it in 0 until iterations) {
             for (body in this) {
                 if (!body.isStatic) {
@@ -48,7 +53,7 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
             }
             step()
             for (body in this) {
-                body.update(this.dt / this.iterations)
+                body.update(dt / this.iterations)
             }
         }
     }
@@ -79,12 +84,12 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
             val collisionMTV = Collision.areSATColliding(body1, body2)
             if (collisionMTV != null) {
                 this.separateBodies(collisionMTV)
-//            const contactPoints = new ContactPoints(body1, body2)
-//            const collisionManifold = new CollisionManifold(
-//                collisionMTV,
-//                contactPoints
-//            )
-//            this.resolveCollisionWithRotation(collisionManifold)
+                val contactPoints = ContactPoints.getContactPoints(body1, body2)
+                val collisionManifold = CollisionManifold(
+                    collisionMTV,
+                    contactPoints
+                )
+                this.resolveCollisionWithRotation(collisionManifold)
             }
         }
     }
@@ -103,9 +108,89 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
         }
     }
 
+    private fun resolveCollisionWithRotation(collisionManifold: CollisionManifold) {
+        val body1: Body = collisionManifold.body1
+        val body2: Body = collisionManifold.body2
+        val normal = collisionManifold.normal.normalize()
+
+        val impulses = mutableListOf<Triple<Vec2, Vec2, Vec2>>()
+
+        val e = min(body1.restitution, body2.restitution)
+
+
+        for (contactPoint in collisionManifold.contactPoints) {
+            val r1 = contactPoint - body1.pos
+            val r2 = contactPoint - body2.pos
+
+            val r1Perp = r1.normal()
+            val r2Perp = r2.normal()
+
+            val angularLinearVelocityBody1 = r1Perp * body1.omega
+            val angularLinearVelocityBody2 = r2Perp * body2.omega
+
+            val relativeVelocity = (body2.velocity + angularLinearVelocityBody2) -
+                (body1.velocity + angularLinearVelocityBody1)
+
+
+            val contactVelocityMag = relativeVelocity.dot(normal)
+
+            if (contactVelocityMag > 0) {
+                continue
+            }
+
+            val r1PerpDotN = r1Perp.dot(normal)
+            val r2PerpDotN = r2Perp.dot(normal)
+
+            var j: Double = -(1 + e) * contactVelocityMag
+            j /= body1.invMass + body2.invMass +
+                (r1PerpDotN * r1PerpDotN) * body1.invInertia +
+                (r2PerpDotN * r2PerpDotN) * body2.invInertia
+            j /= collisionManifold.contactPoints.size
+
+            val impulse = normal * j
+            impulses.add(
+                Triple(
+                    impulse,
+                    r1,
+                    r2
+                )
+            )
+        }
+
+        for ((impulse, r1, r2) in impulses) {
+            body1.velocity -= impulse * body1.invMass
+            body1.omega -= r1.cross(impulse) * body1.invInertia
+            body2.velocity += impulse * body2.invMass
+            body2.omega += r2.cross(impulse) * body2.invInertia
+        }
+    }
+
+
     fun stop() {
         tickJob?.cancel()
         tickJob = null
     }
+
+}
+
+
+data class CollisionManifold(
+    val body1: Body,
+    val body2: Body,
+    val normal: Vec2,
+    val depth: Double,
+    val contactPoints: List<Vec2>
+) {
+
+    constructor(
+        mtv: MTV,
+        contactPoints: List<Vec2>
+    ) : this(
+        mtv.body1,
+        mtv.body2,
+        mtv.normal,
+        mtv.depth,
+        contactPoints
+    )
 
 }
