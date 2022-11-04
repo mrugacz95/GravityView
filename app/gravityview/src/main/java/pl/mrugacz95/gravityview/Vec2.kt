@@ -10,10 +10,6 @@ data class Vec2(val x: Double, val y: Double) {
         val ZERO = Vec2(.0, .0)
     }
 
-    fun transpose(x: Double, y: Double): Vec2 {
-        return Vec2(this.x + x, this.y + y)
-    }
-
     fun rotate(theta: Double): Vec2 {
         val rotatedX = this.x * cos(theta) - this.y * sin(theta)
         val rotatedY = this.x * sin(theta) + this.y * cos(theta)
@@ -57,14 +53,6 @@ data class Vec2(val x: Double, val y: Double) {
         return Vec2(this.x + other.x, this.y + other.y)
     }
 
-    fun pseudoCross(value: Double): Vec2 {
-        return Vec2(-value * this.x, value * this.y)
-    }
-
-    fun toArray(): Array<Double> {
-        return arrayOf(this.x, this.y)
-    }
-
     fun distance(other: Vec2): Double {
         return (this - other).sqrtMagnitude()
     }
@@ -79,5 +67,9 @@ data class Vec2(val x: Double, val y: Double) {
 
     operator fun unaryMinus(): Vec2 {
         return this * (-1.0)
+    }
+
+    operator fun div(scale: Double): Vec2 {
+        return Vec2(this.x / scale, this.y / scale)
     }
 }

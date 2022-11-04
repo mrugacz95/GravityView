@@ -71,16 +71,19 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         engine.add(box)
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
+    fun start() {
         coroutineScope.launch(Dispatchers.Default) {
             engine.start(this@GravityView)
         }
     }
 
+    fun stop() {
+        engine.stop()
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        engine.stop()
+        stop()
     }
 
     override fun addView(child: View, params: LayoutParams?) {
@@ -88,7 +91,9 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         val rectangle = Rectangle(false)
         androidViewToEngineRectangle[child] = rectangle
         val childLayoutParams = (child.layoutParams as GravityLayoutParams)
-        rectangle.pos = Vec2(childLayoutParams.posX / scale, childLayoutParams.posY / scale)
+        rectangle.pos = Vec2(childLayoutParams.marginStart / scale, childLayoutParams.topMargin / scale)
+        rectangle.mass = childLayoutParams.mass
+        rectangle.rotation = childLayoutParams.rotation
         engine.add(rectangle)
     }
 
@@ -96,10 +101,17 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         for (i in 0 until childCount) {
             val child = getChildAt(i)
             child ?: return
-            child.measure(
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-            )
+            val heightMeasure = when (child.layoutParams.height) {
+                LayoutParams.MATCH_PARENT -> MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
+                LayoutParams.WRAP_CONTENT -> MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                else -> MeasureSpec.makeMeasureSpec(child.layoutParams.height, MeasureSpec.EXACTLY)
+            }
+            val widthMeasure = when (child.layoutParams.width) {
+                LayoutParams.MATCH_PARENT -> MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY)
+                LayoutParams.WRAP_CONTENT -> MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                else -> MeasureSpec.makeMeasureSpec(child.layoutParams.width, MeasureSpec.EXACTLY)
+            }
+            child.measure(widthMeasure, heightMeasure)
             val childWidth: Int = child.measuredWidth
             val childHeight: Int = child.measuredHeight
             child.layout(0, 0, childWidth, childHeight)
@@ -133,7 +145,8 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         val paint = Paint()
         val m = Matrix()
         val rectangle = androidViewToEngineRectangle[child] ?: return true
-        m.postTranslate(-child.width.toFloat() / 2f, -child.height.toFloat() / 2f)
+        val leftTopCorner = viewLeftTopCornerVec(child)
+        m.postTranslate(-leftTopCorner.x.toFloat(), -leftTopCorner.y.toFloat())
         m.postRotate(Utils.radToDeg(rectangle.rotation).toFloat())
         m.postTranslate(
             ((rectangle.pos.x) * scale).toFloat(),
@@ -142,6 +155,10 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         child.draw(c)
         canvas?.drawBitmap(b, m, paint)
         return true
+    }
+
+    fun viewLeftTopCornerVec(view: View): Vec2 {
+        return Vec2(view.width.toFloat() / 2.0, view.height.toFloat() / 2.0)
     }
 
     private fun Body.draw(canvas: Canvas) {
@@ -177,36 +194,65 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         return GravityLayoutParams(context, attrs)
     }
 
-    class GravityLayoutParams(context: Context?, attrs: AttributeSet?) : LayoutParams(context, attrs) {
-        val posX: Int
-        val posY: Int
+    override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
+        return true
+    }
+
+    class GravityLayoutParams(context: Context?, attrs: AttributeSet?) : MarginLayoutParams(context, attrs) {
+        val mass: Double
+        val rotation: Double
 
         init {
             val a = context!!.theme.obtainStyledAttributes(
                 attrs, R.styleable.GravityView_LayoutParams, 0, 0
             )
-            posX = a.getDimensionPixelSize(R.styleable.GravityView_LayoutParams_x_pos, 0)
-            posY = a.getDimensionPixelSize(R.styleable.GravityView_LayoutParams_y_pos, 0)
+            mass = a.getFloat(R.styleable.GravityView_LayoutParams_mass, 1f).toDouble()
+            rotation = a.getFloat(R.styleable.GravityView_LayoutParams_rotation, 0f).toDouble()
             a.recycle()
         }
     }
 
-    override fun onTouchEvent(event: MotionEvent?): Boolean {
+    override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
         event ?: return false
-        val x = event.x
-        val y = event.y
-        val pos = Vec2(x / scale, y / scale)
-        for ((body, rect) in androidViewToEngineRectangle.entries) {
-            if (rect.AABB.isInside(pos)) { //todo change to more accurate collision
-                body.onTouchEvent(event)
+        val eventVec2 = event.toVec2()
+        val worldPos = eventVec2 / scale
+        for ((childView, body) in androidViewToEngineRectangle.entries) {
+            if (body.isInside(worldPos)) {
+                val ev = event.transformEventToViewLocal(body, childView)
+                childView.dispatchTouchEvent(ev)
                 return true
             }
         }
         return false
     }
 
-    override fun performClick(): Boolean {
-        return super.performClick()
+    private fun MotionEvent.toVec2() = Vec2(x.toDouble(), y.toDouble())
+
+    private fun MotionEvent.transformEventToViewLocal(body: Body, childView: View): MotionEvent {
+        val eventVec2 = this.toVec2()
+        val leftTopCornerClientPosition = (body.pos * scale) - viewLeftTopCornerVec(childView)
+        val inChildrenPosition = eventVec2 - leftTopCornerClientPosition
+        return this.replaceTouchPosition(inChildrenPosition.x.toFloat(), inChildrenPosition.y.toFloat())
     }
 
+    private fun MotionEvent.replaceTouchPosition(x: Float, y: Float): MotionEvent {
+        return with(this) {
+            MotionEvent.obtain(
+                downTime,
+                eventTime,
+                action,
+                x,
+                y,
+                pressure,
+                size,
+                metaState,
+                xPrecision,
+                yPrecision,
+                deviceId,
+                edgeFlags
+            )
+        }
+    }
 }
+
+

@@ -84,6 +84,8 @@ abstract class Body(val isStatic: Boolean) {
     fun applyAcceleration(a: Vec2, dt: Double) {
         this.velocity += a * dt
     }
+
+    abstract fun isInside(point: Vec2): Boolean
 }
 
 
@@ -143,6 +145,14 @@ class Rectangle(isStatic: Boolean) :
             maxY = max(maxY, p.y)
         }
         return AABB(minX, minY, maxX, maxY)
+    }
+
+    override fun isInside(point: Vec2): Boolean {
+        for (p in this.transformedAxes) {
+            val d = p.axis.cross(p.p2 - point)
+            if (d < 0) return false
+        }
+        return true
     }
 }
 
