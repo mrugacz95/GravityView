@@ -253,6 +253,10 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
             )
         }
     }
+
+    fun getBodies(): List<Body> {
+        return engine
+    }
 }
 
 

@@ -12,6 +12,12 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         val view = binding.root
         setContentView(view)
+        binding.jump.setOnClickListener {
+            for (body in binding.gravityview.getBodies()) {
+                if (!body.isStatic)
+                    body.velocity += Vec2(0.0, -9.0)
+            }
+        }
     }
 
     override fun onPause() {
