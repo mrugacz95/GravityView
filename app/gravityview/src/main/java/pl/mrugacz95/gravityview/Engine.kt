@@ -27,7 +27,6 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
     private val dt: Double = 1.0 / 60
 
     private var tickJob: Job? = null
-    private var lastUpdateTime: Long = System.currentTimeMillis()
 
     suspend fun start(view: View) = coroutineScope {
         tickJob?.cancel()
@@ -35,16 +34,13 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
             tickerFlow(dt.seconds)
                 .cancellable()
                 .collectLatest {
-                    val now = System.currentTimeMillis()
-                    val dt = (now - lastUpdateTime) / 1000.0
-                    lastUpdateTime = now
-                    update(dt)
+                    update()
                     view.invalidate()
                 }
         }
     }
 
-    private fun update(dt: Double) {
+    private fun update() {
         for (it in 0 until iterations) {
             for (body in this) {
                 if (!body.isStatic) {
@@ -58,7 +54,7 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
         }
     }
 
-    fun step() {
+    private fun step() {
         val broadColliding = broadPhrase()
         narrowPhrase(broadColliding)
     }
@@ -69,6 +65,9 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
             for (j in i + 1 until this.size) {
                 val body1 = this[i]
                 val body2 = this[j]
+                if (body1.isStatic && body2.isStatic) {
+                    continue
+                }
                 if (Collision.areAABBColliding(body1, body2)) {
                     collidingBodies.add(i to j)
                 }

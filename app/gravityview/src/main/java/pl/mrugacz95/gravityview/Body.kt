@@ -43,7 +43,7 @@ abstract class Body(val isStatic: Boolean) {
     val color: Int
     val restitution = 0.2
     protected var transformUpdateRequired = true
-    private var cachedAABB: AABB? = null
+    protected var cachedAABB: AABB? = null
     val AABB: AABB
         get() {
             cachedAABB.let { cache ->
@@ -89,21 +89,23 @@ abstract class Body(val isStatic: Boolean) {
 }
 
 
-class Rectangle(isStatic: Boolean) :
-    Body(
-        isStatic
-    ) {
-
+class Rectangle(isStatic: Boolean) : Body(isStatic) {
     var width: Double = 1.0
         set(value) {
             field = value
-            this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
+            updateProperties()
         }
     var height: Double = 1.0
         set(value) {
             field = value
-            this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
+            updateProperties()
         }
+
+    private fun updateProperties() {
+        this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
+        transformUpdateRequired = true
+        cachedAABB = null
+    }
 
     private fun points(): Array<Vec2> = arrayOf(
         Vec2(-width / 2, height / 2),

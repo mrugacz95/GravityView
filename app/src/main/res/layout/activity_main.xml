@@ -6,6 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
+
     <pl.mrugacz95.gravityview.GravityView
         android:id="@+id/gravityview"
         android:layout_width="match_parent"
@@ -17,14 +18,25 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="40dp"
-            android:layout_marginStart="150dp"
+            android:id="@+id/shake"
+            android:layout_marginStart="170dp"
             android:text="Hello World!" />
 
-        <TextView
-            android:layout_width="80dp"
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/gravity_switch"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:layout_marginStart="160dp"
+            android:layout_marginTop="60dp"
+            android:layout_marginLeft="10dp"
+            android:background="@drawable/frame"
+            android:checked="true"
+            android:text="gravity" />
+
+        <TextView
+            android:layout_width="100dp"
+            android:layout_height="25dp"
+            android:layout_marginTop="25dp"
+            android:layout_marginStart="50dp"
             android:background="@drawable/frame"
             android:text="Hello World!" />
 
@@ -32,15 +44,17 @@
             android:id="@+id/group"
             android:layout_width="90dp"
             android:layout_height="120dp"
-            android:layout_marginTop="60dp"
+            android:layout_marginTop="95dp"
             android:layout_marginStart="290dp"
-            android:background="@drawable/frame">
+            android:background="@drawable/frame"
+            app:rotation="-1.6">
 
             <Button
+                android:id="@+id/stop"
                 android:layout_width="wrap_content"
                 android:layout_height="60dp"
                 android:layout_gravity="start|top"
-                android:text="Gravity" />
+                android:text="Stop" />
 
             <Button
                 android:id="@+id/jump"
@@ -53,7 +67,7 @@
         <EditText
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="130dp"
+            android:layout_marginTop="220dp"
             android:layout_marginStart="300dp"
             android:src="@drawable/ic_launcher_foreground"
             android:hint="password"

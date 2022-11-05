@@ -12,6 +12,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Transformation
+import androidx.core.view.marginStart
+import androidx.core.view.marginTop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -25,10 +27,12 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     constructor(context: Context?, attrs: AttributeSet?) : this(context, attrs, 0)
 
-    private val engine = Engine()
+    private var initiallyPositioned = false
+    val engine = Engine()
     private val coroutineScope = MainScope() + Job()
     private val androidViewToEngineRectangle = HashMap<View, Rectangle>()
     private val scale = 100.0
+    private val solidFrame = List(4) { Rectangle(true) }
 
     init {
         setWillNotDraw(false)
@@ -41,33 +45,12 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         engine.g = gravity.toDouble()
         a.recycle()
 
-        val solidGround = Rectangle(true)
-        solidGround.pos = Vec2(5.0, 9.0)
-        solidGround.width = 9.0
-        solidGround.height = 1.5
-        solidGround.mass = 1.0
-        engine.add(solidGround)
-
-
-        val leftWall = Rectangle(true)
-        leftWall.pos = Vec2(0.0, 5.5)
-        leftWall.width = 1.0
-        leftWall.height = 10.0
-        leftWall.mass = 1.0
-        engine.add(leftWall)
-
-        val rightWall = Rectangle(true)
-        rightWall.pos = Vec2(10.0, 5.5)
-        rightWall.width = 1.0
-        rightWall.height = 10.0
-        rightWall.mass = 1.0
-        engine.add(rightWall)
-
+        engine.addAll(solidFrame)
         val box = Rectangle(false)
         box.width = 1.0
         box.height = 1.0
         box.mass = 1.0
-        box.pos = Vec2(5.0, 3.0)
+        box.pos = Vec2(5.0, 5.0)
         engine.add(box)
     }
 
@@ -91,10 +74,30 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         val rectangle = Rectangle(false)
         androidViewToEngineRectangle[child] = rectangle
         val childLayoutParams = (child.layoutParams as GravityLayoutParams)
-        rectangle.pos = Vec2(childLayoutParams.marginStart / scale, childLayoutParams.topMargin / scale)
         rectangle.mass = childLayoutParams.mass
         rectangle.rotation = childLayoutParams.rotation
         engine.add(rectangle)
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val frameThickness = 1.0
+        // left
+        solidFrame[0].width = frameThickness
+        solidFrame[0].height = measuredHeight / scale
+        solidFrame[0].pos = Vec2(-frameThickness / 2, measuredHeight / 2.0 / scale)
+        // right
+        solidFrame[1].width = frameThickness
+        solidFrame[1].height = measuredHeight / scale
+        solidFrame[1].pos = Vec2(measuredWidth / scale + frameThickness / 2, measuredHeight / 2.0 / scale)
+        // top
+        solidFrame[2].width = measuredWidth / scale
+        solidFrame[2].height = frameThickness
+        solidFrame[2].pos = Vec2(measuredWidth / 2.0 / scale - 1, -frameThickness / 2)
+        // bottom
+        solidFrame[3].width = measuredWidth / scale
+        solidFrame[3].height = frameThickness
+        solidFrame[3].pos = Vec2(measuredWidth / 2.0 / scale, measuredHeight / scale + frameThickness / 2.0)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -114,13 +117,29 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
             child.measure(widthMeasure, heightMeasure)
             val childWidth: Int = child.measuredWidth
             val childHeight: Int = child.measuredHeight
-            child.layout(0, 0, childWidth, childHeight)
+            val marginTop = child.marginTop
+            val marginStart = child.marginStart
+            child.layout(
+                marginStart,
+                marginTop,
+                marginStart + childWidth,
+                marginTop + childHeight
+            )
+            val childLayoutParams = child.layoutParams as GravityLayoutParams
+            if (!initiallyPositioned) {
+                androidViewToEngineRectangle[child]?.pos = Vec2(
+                    x = (childLayoutParams.marginStart + childWidth / 2f) / scale,
+                    y = (childLayoutParams.topMargin + childHeight / 2f) / scale
+                )
+            }
             val rectangle = androidViewToEngineRectangle[child]
             rectangle ?: continue
             rectangle.width = childWidth / scale
             rectangle.height = childHeight / scale
         }
+        initiallyPositioned = true
     }
+
 
 
     override fun onDraw(canvas: Canvas?) {
@@ -157,7 +176,7 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         return true
     }
 
-    fun viewLeftTopCornerVec(view: View): Vec2 {
+    private fun viewLeftTopCornerVec(view: View): Vec2 {
         return Vec2(view.width.toFloat() / 2.0, view.height.toFloat() / 2.0)
     }
 
@@ -198,12 +217,12 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         return true
     }
 
-    class GravityLayoutParams(context: Context?, attrs: AttributeSet?) : MarginLayoutParams(context, attrs) {
+    class GravityLayoutParams(context: Context, attrs: AttributeSet?) : MarginLayoutParams(context, attrs) {
         val mass: Double
         val rotation: Double
 
         init {
-            val a = context!!.theme.obtainStyledAttributes(
+            val a = context.theme.obtainStyledAttributes(
                 attrs, R.styleable.GravityView_LayoutParams, 0, 0
             )
             mass = a.getFloat(R.styleable.GravityView_LayoutParams_mass, 1f).toDouble()
@@ -230,8 +249,8 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     private fun MotionEvent.transformEventToViewLocal(body: Body, childView: View): MotionEvent {
         val eventVec2 = this.toVec2()
-        val leftTopCornerClientPosition = (body.pos * scale) - viewLeftTopCornerVec(childView)
-        val inChildrenPosition = eventVec2 - leftTopCornerClientPosition
+        val leftTopCornerClientPosition = (body.pos * scale) - viewLeftTopCornerVec(childView).rotate(body.rotation)
+        val inChildrenPosition = (eventVec2 - leftTopCornerClientPosition).rotate(-body.rotation)
         return this.replaceTouchPosition(inChildrenPosition.x.toFloat(), inChildrenPosition.y.toFloat())
     }
 
