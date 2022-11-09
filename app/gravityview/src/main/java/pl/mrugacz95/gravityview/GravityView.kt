@@ -44,14 +44,7 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         val gravity: Float = a.getFloat(R.styleable.GravityView_gravity, 9.81f)
         engine.g = gravity.toDouble()
         a.recycle()
-
         engine.addAll(solidFrame)
-        val box = Rectangle(false)
-        box.width = 1.0
-        box.height = 1.0
-        box.mass = 1.0
-        box.pos = Vec2(5.0, 5.0)
-        engine.add(box)
     }
 
     fun start() {
