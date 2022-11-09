@@ -70,9 +70,6 @@ abstract class Body(val isStatic: Boolean) {
 
 
     fun update(dt: Double) {
-        if (this.isStatic) {
-            return
-        }
         this.pos += this.velocity * dt
         this.rotation += this.omega * dt
         this.cachedAABB = null
@@ -102,6 +99,7 @@ class Rectangle(isStatic: Boolean) : Body(isStatic) {
         }
 
     private fun updateProperties() {
+        this.mass = width * height * 0.1
         this.inertia = 1.0 / 12.0 * mass * (width * width + height * height)
         transformUpdateRequired = true
         cachedAABB = null

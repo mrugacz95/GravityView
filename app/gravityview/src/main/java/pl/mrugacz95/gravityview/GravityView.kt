@@ -63,11 +63,11 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     override fun addView(child: View, params: LayoutParams?) {
         super.addView(child, params)
-        val rectangle = Rectangle(false)
-        androidViewToEngineRectangle[child] = rectangle
         val childLayoutParams = (child.layoutParams as GravityLayoutParams)
+        val rectangle = Rectangle(childLayoutParams.isStatic)
         rectangle.mass = childLayoutParams.mass
         rectangle.rotation = childLayoutParams.rotation
+        androidViewToEngineRectangle[child] = rectangle
         engine.add(rectangle)
     }
 
@@ -212,14 +212,16 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
     class GravityLayoutParams(context: Context, attrs: AttributeSet?) : MarginLayoutParams(context, attrs) {
         val mass: Double
         val rotation: Double
+        val isStatic: Boolean
         var initiallyPositioned = false
 
         init {
             val a = context.theme.obtainStyledAttributes(
                 attrs, R.styleable.GravityView_LayoutParams, 0, 0
             )
-            mass = a.getFloat(R.styleable.GravityView_LayoutParams_mass, 1f).toDouble()
+            mass = a.getFloat(R.styleable.GravityView_LayoutParams_mass, 1.0f).toDouble()
             rotation = a.getFloat(R.styleable.GravityView_LayoutParams_rotation, 0f).toDouble()
+            isStatic = a.getBoolean(R.styleable.GravityView_LayoutParams_isStatic, false)
             a.recycle()
         }
     }
