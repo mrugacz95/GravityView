@@ -27,7 +27,6 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     constructor(context: Context?, attrs: AttributeSet?) : this(context, attrs, 0)
 
-    private var initiallyPositioned = false
     val engine = Engine()
     private val coroutineScope = MainScope() + Job()
     private val androidViewToEngineRectangle = HashMap<View, Rectangle>()
@@ -91,23 +90,25 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         solidFrame[3].width = measuredWidth / scale
         solidFrame[3].height = frameThickness
         solidFrame[3].pos = Vec2(measuredWidth / 2.0 / scale, measuredHeight / scale + frameThickness / 2.0)
+
+        measureChildren(widthMeasureSpec, heightMeasureSpec)
+
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            child ?: continue
+            val rectangle = androidViewToEngineRectangle[child]
+            rectangle ?: continue
+            val childWidth: Int = child.measuredWidth
+            val childHeight: Int = child.measuredHeight
+            rectangle.width = childWidth / scale
+            rectangle.height = childHeight / scale
+        }
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         for (i in 0 until childCount) {
             val child = getChildAt(i)
-            child ?: return
-            val heightMeasure = when (child.layoutParams.height) {
-                LayoutParams.MATCH_PARENT -> MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
-                LayoutParams.WRAP_CONTENT -> MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-                else -> MeasureSpec.makeMeasureSpec(child.layoutParams.height, MeasureSpec.EXACTLY)
-            }
-            val widthMeasure = when (child.layoutParams.width) {
-                LayoutParams.MATCH_PARENT -> MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY)
-                LayoutParams.WRAP_CONTENT -> MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-                else -> MeasureSpec.makeMeasureSpec(child.layoutParams.width, MeasureSpec.EXACTLY)
-            }
-            child.measure(widthMeasure, heightMeasure)
+            child ?: continue
             val childWidth: Int = child.measuredWidth
             val childHeight: Int = child.measuredHeight
             val marginTop = child.marginTop
@@ -119,20 +120,15 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
                 marginTop + childHeight
             )
             val childLayoutParams = child.layoutParams as GravityLayoutParams
-            if (!initiallyPositioned) {
+            if (!childLayoutParams.initiallyPositioned) {
                 androidViewToEngineRectangle[child]?.pos = Vec2(
                     x = (childLayoutParams.marginStart + childWidth / 2f) / scale,
                     y = (childLayoutParams.topMargin + childHeight / 2f) / scale
                 )
+                childLayoutParams.initiallyPositioned = true
             }
-            val rectangle = androidViewToEngineRectangle[child]
-            rectangle ?: continue
-            rectangle.width = childWidth / scale
-            rectangle.height = childHeight / scale
         }
-        initiallyPositioned = true
     }
-
 
 
     override fun onDraw(canvas: Canvas?) {
@@ -152,6 +148,9 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     override fun drawChild(canvas: Canvas?, child: View?, drawingTime: Long): Boolean {
         child ?: return false
+        if (child.width == 0 || child.height == 0) {
+            return false
+        }
         val b = Bitmap.createBitmap(child.width, child.height, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
         val paint = Paint()
@@ -213,6 +212,7 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
     class GravityLayoutParams(context: Context, attrs: AttributeSet?) : MarginLayoutParams(context, attrs) {
         val mass: Double
         val rotation: Double
+        var initiallyPositioned = false
 
         init {
             val a = context.theme.obtainStyledAttributes(
