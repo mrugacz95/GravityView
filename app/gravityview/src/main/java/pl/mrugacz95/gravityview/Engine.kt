@@ -4,18 +4,18 @@ import android.view.View
 import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-fun tickerFlow(period: Duration, initialDelay: Duration = Duration.ZERO) = flow {
-    delay(initialDelay)
+fun tickerFlow(period: Duration) = flow {
     while (true) {
         emit(Unit)
         delay(period)
@@ -25,17 +25,17 @@ fun tickerFlow(period: Duration, initialDelay: Duration = Duration.ZERO) = flow 
 class Engine(var g: Double = 9.81) : LinkedList<Body>() {
     private val iterations: Int = 20
     private val dt: Double = 1.0 / 60
-
+    private val coroutineScope = MainScope() + Job()
     private var tickJob: Job? = null
 
-    suspend fun start(view: View) = coroutineScope {
+    fun start(view: View) {
         tickJob?.cancel()
-        tickJob = launch(Dispatchers.Default) {
+        tickJob = coroutineScope.launch(Dispatchers.IO) {
             tickerFlow(dt.seconds)
                 .cancellable()
                 .collectLatest {
                     update()
-                    view.invalidate()
+                    view.postInvalidate()
                 }
         }
     }

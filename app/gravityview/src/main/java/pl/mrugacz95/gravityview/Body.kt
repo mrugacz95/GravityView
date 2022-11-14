@@ -16,7 +16,17 @@ abstract class Body(val isStatic: Boolean) {
             transformUpdateRequired = true
         }
     var omega = .0
+        set(value) {
+            if (!isStatic) {
+                field = value
+            }
+        }
     var velocity = Vec2.ZERO
+        set(value) {
+            if (!isStatic) {
+                field = value
+            }
+        }
     var mass: Double = 1.0
         set(value) {
             if (value < 0) {
@@ -33,21 +43,21 @@ abstract class Body(val isStatic: Boolean) {
     var invInertia: Double
     var inertia: Double = 1.0
         set(value) {
-            if (isStatic) {
-                invInertia = 0.0
+            invInertia = if (isStatic) {
+                0.0
             } else {
-                invInertia = 1 / value
+                1 / value
             }
             field = value
         }
     val color: Int
     val restitution = 0.2
-    protected var transformUpdateRequired = true
+    var transformUpdateRequired = true
     protected var cachedAABB: AABB? = null
     val AABB: AABB
         get() {
             cachedAABB.let { cache ->
-                if (cache == null) {
+                if (cache == null || transformUpdateRequired) {
                     calculateAABB().let {
                         cachedAABB = it
                         return it
@@ -72,7 +82,6 @@ abstract class Body(val isStatic: Boolean) {
     fun update(dt: Double) {
         this.pos += this.velocity * dt
         this.rotation += this.omega * dt
-        this.cachedAABB = null
         this.transformUpdateRequired = true
     }
 
@@ -121,6 +130,7 @@ class Rectangle(isStatic: Boolean) : Body(isStatic) {
                 for (i in points.indices) {
                     this.cachedTransformedPoints[i] = points[i].rotate(rotation) + this.pos
                 }
+                this.cachedAABB = null
                 transformUpdateRequired = false
             }
             return cachedTransformedPoints

@@ -17,8 +17,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(view)
         binding.jump.setOnClickListener {
             for (body in binding.gravityview.getBodies()) {
-                if (!body.isStatic)
-                    body.velocity += Vec2(0.0, -9.0)
+                body.velocity += Vec2(0.0, -9.0)
             }
         }
         binding.stop.setOnClickListener {
