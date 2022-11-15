@@ -2,12 +2,7 @@ package pl.mrugacz95.gravityview
 
 import android.content.Context
 import android.content.res.TypedArray
-import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.PorterDuff
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -16,21 +11,21 @@ import androidx.core.view.marginStart
 import androidx.core.view.marginTop
 
 
-class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : ViewGroup(context, attrs, defStyle) {
+class GravityView(context: Context, attrs: AttributeSet?, defStyle: Int) : ViewGroup(context, attrs, defStyle) {
 
-    constructor(context: Context?) : this(context, null, 0)
+    constructor(context: Context) : this(context, null, 0)
 
-    constructor(context: Context?, attrs: AttributeSet?) : this(context, attrs, 0)
+    constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
 
     val engine = Engine()
-    private val androidViewToRenderingData = HashMap<View, RenderingData>()
+    private val androidViewToRectangle = HashMap<View, Rectangle>()
     private val scale = 100.0
     private val solidFrame = List(4) { Rectangle(true) }
 
     init {
         setWillNotDraw(false)
 
-        val a: TypedArray = context!!.obtainStyledAttributes(
+        val a: TypedArray = context.obtainStyledAttributes(
             attrs,
             R.styleable.GravityView, 0, 0
         )
@@ -59,13 +54,13 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         val rectangle = Rectangle(childLayoutParams.isStatic)
         rectangle.mass = childLayoutParams.mass
         rectangle.rotation = childLayoutParams.rotation
-        androidViewToRenderingData[child] = RenderingData(rectangle, null, null)
+        androidViewToRectangle[child] = rectangle
         engine.add(rectangle)
     }
 
     override fun removeView(view: View?) {
         super.removeView(view)
-        androidViewToRenderingData.remove(view)
+        androidViewToRectangle.remove(view)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -74,34 +69,35 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         // left
         solidFrame[0].width = frameThickness
         solidFrame[0].height = measuredHeight / scale
-        solidFrame[0].pos = Vec2(-frameThickness / 2, measuredHeight / 2.0 / scale)
+        solidFrame[0].x = -frameThickness / 2
+        solidFrame[0].y = measuredHeight / 2.0 / scale
         // right
         solidFrame[1].width = frameThickness
         solidFrame[1].height = measuredHeight / scale
-        solidFrame[1].pos = Vec2(measuredWidth / scale + frameThickness / 2, measuredHeight / 2.0 / scale)
+        solidFrame[1].x = measuredWidth / scale + frameThickness / 2
+        solidFrame[1].y = measuredHeight / 2.0 / scale
         // top
         solidFrame[2].width = measuredWidth / scale
         solidFrame[2].height = frameThickness
-        solidFrame[2].pos = Vec2(measuredWidth / 2.0 / scale - 1, -frameThickness / 2)
+        solidFrame[2].x = measuredWidth / 2.0 / scale - 1
+        solidFrame[2].y = -frameThickness / 2
         // bottom
         solidFrame[3].width = measuredWidth / scale
         solidFrame[3].height = frameThickness
-        solidFrame[3].pos = Vec2(measuredWidth / 2.0 / scale, measuredHeight / scale + frameThickness / 2.0)
+        solidFrame[3].x = measuredWidth / 2.0 / scale
+        solidFrame[3].y = measuredHeight / scale + frameThickness / 2.0
 
         measureChildren(widthMeasureSpec, heightMeasureSpec)
 
         for (i in 0 until childCount) {
             val child = getChildAt(i)
             child ?: continue
-            val renderingData = androidViewToRenderingData[child]
-            renderingData ?: continue
+            val rectangle = androidViewToRectangle[child]
+            rectangle ?: continue
             val childWidth: Int = child.measuredWidth
             val childHeight: Int = child.measuredHeight
-            renderingData.rectangle.width = childWidth / scale
-            renderingData.rectangle.height = childHeight / scale
-            val bitmap = Bitmap.createBitmap(childWidth, childHeight, Bitmap.Config.ARGB_8888)
-            renderingData.bitmap = bitmap
-            renderingData.canvas = Canvas(bitmap)
+            rectangle.width = childWidth / scale
+            rectangle.height = childHeight / scale
         }
     }
 
@@ -121,10 +117,10 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
             )
             val childLayoutParams = child.layoutParams as GravityLayoutParams
             if (!childLayoutParams.initiallyPositioned) {
-                androidViewToRenderingData[child]?.rectangle?.pos = Vec2(
-                    x = (childLayoutParams.marginStart + childWidth / 2f) / scale,
-                    y = (childLayoutParams.topMargin + childHeight / 2f) / scale
-                )
+                androidViewToRectangle[child]?.let { rect ->
+                    rect.x = (childLayoutParams.marginStart + childWidth / 2f) / scale
+                    rect.y = (childLayoutParams.topMargin + childHeight / 2f) / scale
+                }
                 childLayoutParams.initiallyPositioned = true
             }
         }
@@ -132,24 +128,21 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
 
     override fun drawChild(canvas: Canvas?, child: View?, drawingTime: Long): Boolean {
         child ?: return false
+        canvas ?: return false
         if (child.width == 0 || child.height == 0) {
             return false
         }
-        val renderingData = androidViewToRenderingData[child] ?: return false
-        val paint = Paint()
-        val m = Matrix()
+        val rectangle = androidViewToRectangle[child] ?: return false
         val leftTopCorner = viewLeftTopCornerVec(child)
-        m.postTranslate(-leftTopCorner.x.toFloat(), -leftTopCorner.y.toFloat())
-        m.postRotate(Utils.radToDeg(renderingData.rectangle.rotation).toFloat())
-        m.postTranslate(
-            ((renderingData.rectangle.pos.x) * scale).toFloat(),
-            ((renderingData.rectangle.pos.y) * scale).toFloat()
+        canvas.save()
+        canvas.translate(
+            ((rectangle.pos.x) * scale).toFloat(),
+            ((rectangle.pos.y) * scale).toFloat()
         )
-        renderingData.canvas?.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        child.draw(renderingData.canvas)
-        renderingData.bitmap?.let { bitmap ->
-            canvas?.drawBitmap(bitmap, m, paint)
-        }
+        canvas.rotate(Utils.radToDeg(rectangle.rotation).toFloat())
+        canvas.translate(-leftTopCorner.x.toFloat(), -leftTopCorner.y.toFloat())
+        child.draw(canvas)
+        canvas.restore()
         return true
     }
 
@@ -196,9 +189,9 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
         event ?: return false
         val eventVec2 = event.toVec2()
         val worldPos = eventVec2 / scale
-        for ((childView, data) in androidViewToRenderingData.entries) {
-            if (data.rectangle.isInside(worldPos)) {
-                val ev = event.transformEventToViewLocal(data.rectangle, childView)
+        for ((childView, rectangle) in androidViewToRectangle.entries) {
+            if (rectangle.isInside(worldPos)) {
+                val ev = event.transformEventToViewLocal(rectangle, childView)
                 childView.dispatchTouchEvent(ev)
                 return true
             }
@@ -237,12 +230,6 @@ class GravityView(context: Context?, attrs: AttributeSet?, defStyle: Int) : View
     fun getBodies(): List<Body> {
         return engine
     }
-
-    data class RenderingData(
-        val rectangle: Rectangle,
-        var canvas: Canvas?,
-        var bitmap: Bitmap?,
-    )
 }
 
 

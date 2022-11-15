@@ -5,11 +5,24 @@ import kotlin.math.max
 import kotlin.math.min
 
 abstract class Body(val isStatic: Boolean) {
-    var pos = Vec2.ZERO
+    var x: Double = 0.0
         set(value) {
             field = value
             transformUpdateRequired = true
         }
+    var y: Double = 0.0
+        set(value) {
+            field = value
+            transformUpdateRequired = true
+        }
+    var pos: Vec2
+        set(value) {
+            transformUpdateRequired = true
+            x = value.x
+            y = value.y
+        }
+        get() = Vec2(x, y)
+
     var rotation: Double = .0
         set(value) {
             field = value
