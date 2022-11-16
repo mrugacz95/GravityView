@@ -1,7 +1,6 @@
 package pl.mrugacz95.gravityview
 
 import android.view.View
-import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -22,11 +21,21 @@ fun tickerFlow(period: Duration) = flow {
     }
 }
 
-class Engine(var g: Double = 9.81) : LinkedList<Body>() {
+class Engine(var g: Double = 9.81) {
     private val iterations: Int = 20
     private val dt: Double = 1.0 / 60
     private val coroutineScope = MainScope() + Job()
     private var tickJob: Job? = null
+    val bodies = mutableListOf<Body>()
+    private val broadCollidingBodies = mutableListOf<Pair<Int, Int>>()
+
+    fun addBody(body: Body) {
+        bodies.add(body)
+    }
+
+    fun addAllBodies(bodies: Iterable<Body>) {
+        this.bodies.addAll(bodies)
+    }
 
     fun start(view: View) {
         tickJob?.cancel()
@@ -42,13 +51,13 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
 
     private fun update() {
         for (it in 0 until iterations) {
-            for (body in this) {
+            for (body in bodies) {
                 if (!body.isStatic) {
                     body.applyAcceleration(Vec2(.0, this.g), dt / this.iterations)
                 }
             }
             step()
-            for (body in this) {
+            for (body in bodies) {
                 body.update(dt / this.iterations)
             }
         }
@@ -60,26 +69,26 @@ class Engine(var g: Double = 9.81) : LinkedList<Body>() {
     }
 
     private fun broadPhrase(): List<Pair<Int, Int>> {
-        val collidingBodies = mutableListOf<Pair<Int, Int>>()
-        for (i in this.indices) {
-            for (j in i + 1 until this.size) {
-                val body1 = this[i]
-                val body2 = this[j]
+        broadCollidingBodies.clear()
+        for (i in bodies.indices) {
+            for (j in i + 1 until bodies.size) {
+                val body1 = bodies[i]
+                val body2 = bodies[j]
                 if (body1.isStatic && body2.isStatic) {
                     continue
                 }
                 if (Collision.areAABBColliding(body1, body2)) {
-                    collidingBodies.add(i to j)
+                    broadCollidingBodies.add(i to j)
                 }
             }
         }
-        return collidingBodies
+        return broadCollidingBodies
     }
 
     private fun narrowPhrase(broadColliding: List<Pair<Int, Int>>) {
         for ((body1idx, body2idx) in broadColliding) {
-            val body1 = this[body1idx]
-            val body2 = this[body2idx]
+            val body1 = bodies[body1idx]
+            val body2 = bodies[body2idx]
             val collisionMTV = Collision.areSATColliding(body1, body2)
             if (collisionMTV != null) {
                 this.separateBodies(collisionMTV)
