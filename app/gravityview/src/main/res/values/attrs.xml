@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="GravityView">
+        <attr name="gravity" format="float" />
+    </declare-styleable>
+    <declare-styleable name="GravityView_LayoutParams">
+        <attr name="mass" format="float" />
+        <attr name="rotation" format="float" />
+        <attr name="isStatic" format="boolean" />
+    </declare-styleable>
+</resources>
