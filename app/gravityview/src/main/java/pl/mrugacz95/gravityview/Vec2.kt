@@ -73,3 +73,7 @@ data class Vec2(val x: Double, val y: Double) {
         return Vec2(this.x / scale, this.y / scale)
     }
 }
+
+operator fun Double.times(normal: Vec2): Vec2 {
+    return normal * this
+}

@@ -65,6 +65,8 @@ abstract class Body(val isStatic: Boolean) {
         }
     val color: Int
     val restitution = 0.2
+    val staticFriction = 0.6
+    val dynamicFriction = 0.4
     var transformUpdateRequired = true
     protected var cachedAABB: AABB? = null
     val AABB: AABB

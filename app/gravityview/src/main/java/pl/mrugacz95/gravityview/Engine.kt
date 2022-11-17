@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -97,7 +99,7 @@ class Engine(var g: Double = 9.81) {
                     collisionMTV,
                     contactPoints
                 )
-                this.resolveCollisionWithRotation(collisionManifold)
+                this.resolveCollisionWithRotationAndFriction(collisionManifold)
             }
         }
     }
@@ -116,17 +118,21 @@ class Engine(var g: Double = 9.81) {
         }
     }
 
-    private fun resolveCollisionWithRotation(collisionManifold: CollisionManifold) {
+    private fun resolveCollisionWithRotationAndFriction(collisionManifold: CollisionManifold) {
         val body1: Body = collisionManifold.body1
         val body2: Body = collisionManifold.body2
         val normal = collisionManifold.normal.normalize()
 
         val impulses = mutableListOf<Triple<Vec2, Vec2, Vec2>>()
+        val frictionImpulses = mutableListOf<Triple<Vec2, Vec2, Vec2>>()
+        val jValues = mutableListOf<Double>()
 
         val e = min(body1.restitution, body2.restitution)
+        val staticFriction = pythagoreanSolve(body1.staticFriction, body2.staticFriction)
+        val dynamicFriction = pythagoreanSolve(body1.dynamicFriction, body2.dynamicFriction)
 
-
-        for (contactPoint in collisionManifold.contactPoints) {
+        for (i in collisionManifold.contactPoints.indices) {
+            val contactPoint = collisionManifold.contactPoints[i]
             val r1 = contactPoint - body1.pos
             val r2 = contactPoint - body2.pos
 
@@ -155,6 +161,8 @@ class Engine(var g: Double = 9.81) {
                 (r2PerpDotN * r2PerpDotN) * body2.invInertia
             j /= collisionManifold.contactPoints.size
 
+            jValues.add(j)
+
             val impulse = normal * j
             impulses.add(
                 Triple(
@@ -171,7 +179,67 @@ class Engine(var g: Double = 9.81) {
             body2.velocity += impulse * body2.invMass
             body2.omega += r2.cross(impulse) * body2.invInertia
         }
+
+        // friction
+        for (i in collisionManifold.contactPoints.indices) {
+            if (jValues.size <= i) break
+            val contactPoint = collisionManifold.contactPoints[i]
+            val r1 = contactPoint - body1.pos
+            val r2 = contactPoint - body2.pos
+
+            val r1Perp = r1.normal()
+            val r2Perp = r2.normal()
+
+            val angularLinearVelocityBody1 = r1Perp * body1.omega
+            val angularLinearVelocityBody2 = r2Perp * body2.omega
+
+            val relativeVelocity = (body2.velocity + angularLinearVelocityBody2) -
+                (body1.velocity + angularLinearVelocityBody1)
+
+            var tangent = relativeVelocity - relativeVelocity.dot(normal) * normal
+
+            if (tangent.isCloseTo(Vec2.ZERO)) {
+                continue
+            } else {
+                tangent = tangent.normalize()
+            }
+
+            val r1PerpDotT = r1Perp.dot(tangent)
+            val r2PerpDotT = r2Perp.dot(tangent)
+
+            var jt: Double = -relativeVelocity.dot(normal)
+            jt /= body1.invMass + body2.invMass +
+                (r1PerpDotT * r1PerpDotT) * body1.invInertia +
+                (r2PerpDotT * r2PerpDotT) * body2.invInertia
+            jt /= collisionManifold.contactPoints.size
+
+            val j = jValues[i]
+
+            val frictionImpulse = if (abs(j) < -j * staticFriction) {
+                tangent * jt
+            } else {
+                tangent * -j * dynamicFriction
+            }
+
+            frictionImpulses.add(
+                Triple(
+                    frictionImpulse,
+                    r1,
+                    r2
+                )
+            )
+        }
+
+        for ((frictionImpulse, r1, r2) in frictionImpulses) {
+            body1.velocity -= frictionImpulse * body1.invMass
+            body1.omega -= r1.cross(frictionImpulse) * body1.invInertia
+            body2.velocity += frictionImpulse * body2.invMass
+            body2.omega += r2.cross(frictionImpulse) * body2.invInertia
+        }
+
     }
+
+    private fun pythagoreanSolve(a: Double, b: Double) = sqrt(a * a + b * b)
 
 
     fun stop() {
@@ -180,7 +248,6 @@ class Engine(var g: Double = 9.81) {
     }
 
 }
-
 
 data class CollisionManifold(
     val body1: Body,
