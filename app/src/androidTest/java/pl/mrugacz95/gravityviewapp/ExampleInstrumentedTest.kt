@@ -1,4 +1,4 @@
-package pl.mrugacz95.gravityview
+package pl.mrugacz95.gravityviewapp
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry

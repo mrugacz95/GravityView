@@ -1,4 +1,4 @@
-package pl.mrugacz95.gravityview
+package pl.mrugacz95.gravityviewapp
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

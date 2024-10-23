@@ -3,15 +3,18 @@ package pl.mrugacz95.gravityview
 import android.content.Context
 import android.content.res.TypedArray
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.children
 import androidx.core.view.marginStart
 import androidx.core.view.marginTop
-
 
 class GravityView(context: Context, attrs: AttributeSet?, defStyle: Int) : ViewGroup(context, attrs, defStyle) {
 
@@ -23,9 +26,14 @@ class GravityView(context: Context, attrs: AttributeSet?, defStyle: Int) : ViewG
     private val androidViewToEngineRectangle = HashMap<View, Rectangle>()
     private val scale = 100.0
     private val solidFrame = List(4) { Rectangle(true) }
-
+    private var transparentPaint : Paint
     init {
         setWillNotDraw(false)
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
+
+        transparentPaint = Paint()
+        transparentPaint.color = Color.TRANSPARENT
+        transparentPaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.CLEAR))
 
         val a: TypedArray = context.obtainStyledAttributes(
             attrs,
@@ -156,25 +164,25 @@ class GravityView(context: Context, attrs: AttributeSet?, defStyle: Int) : ViewG
         }
     }
 
-
-    override fun drawChild(canvas: Canvas?, child: View?, drawingTime: Long): Boolean {
-        child ?: return false
-        canvas ?: return false
-        if (child.width == 0 || child.height == 0) {
-            return false
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), transparentPaint);
+        for (child in children) {
+            if (child.width == 0 || child.height == 0) {
+                continue
+            }
+            val rectangle = androidViewToEngineRectangle[child] ?: continue
+            val leftTopCorner = viewLeftTopCornerVec(child)
+            canvas.save()
+            canvas.translate(
+                ((rectangle.pos.x) * scale).toFloat(),
+                ((rectangle.pos.y) * scale).toFloat()
+            )
+            canvas.rotate(Utils.radToDeg(rectangle.rotation).toFloat())
+            canvas.translate(-leftTopCorner.x.toFloat(), -leftTopCorner.y.toFloat())
+            child.draw(canvas)
+            canvas.restore()
         }
-        val rectangle = androidViewToEngineRectangle[child] ?: return false
-        val leftTopCorner = viewLeftTopCornerVec(child)
-        canvas.save()
-        canvas.translate(
-            ((rectangle.pos.x) * scale).toFloat(),
-            ((rectangle.pos.y) * scale).toFloat()
-        )
-        canvas.rotate(Utils.radToDeg(rectangle.rotation).toFloat())
-        canvas.translate(-leftTopCorner.x.toFloat(), -leftTopCorner.y.toFloat())
-        child.draw(canvas)
-        canvas.restore()
-        return true
     }
 
     private fun viewLeftTopCornerVec(view: View): Vec2 {
