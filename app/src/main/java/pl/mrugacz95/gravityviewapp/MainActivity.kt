@@ -1,14 +1,15 @@
-package pl.mrugacz95.gravityview
+package pl.mrugacz95.gravityviewapp
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import pl.mrugacz95.gravityview.databinding.ActivityMainBinding
+import pl.mrugacz95.gravityview.Vec2
+import pl.mrugacz95.gravityviewapp.databinding.ActivityMainBinding
 import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    var stopped = false
+    private var stopped = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,16 +24,16 @@ class MainActivity : AppCompatActivity() {
         binding.stop.setOnClickListener {
             if (!stopped) {
                 binding.gravityview.stop()
-                binding.stop.text = "start"
+                binding.stop.setText(R.string.start)
             } else {
-                binding.stop.text = "stop"
+                binding.stop.setText(R.string.stop)
                 binding.gravityview.start()
             }
             stopped = !stopped
         }
         binding.gravitySwitch.setOnCheckedChangeListener { _, isChecked ->
             binding.gravityview.engine.g = if (isChecked) {
-                9.81
+                GRAVITY_CONSTANT
             } else {
                 0.0
             }
@@ -53,5 +54,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.gravityview.start()
+    }
+
+    companion object {
+        const val GRAVITY_CONSTANT = 9.81
     }
 }
